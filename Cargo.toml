@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "foundos_kernel",
+    "foundos_bootloader"
+]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
