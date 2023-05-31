@@ -15,9 +15,9 @@ call switch_to_32bit
 
 jmp $
 
-%include "asm/disk.asm"
-%include "asm/gdt.asm"
-%include "asm/switch_to_32bit.asm"
+%include "foundos_bootloader/asm/disk.asm"
+%include "foundos_bootloader/asm/gdt.asm"
+%include "foundos_bootloader/asm/switch_to_32bit.asm"
 
 [bits 16]
 load_kernel:
