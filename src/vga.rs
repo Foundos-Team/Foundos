@@ -13,6 +13,38 @@ const MAX_ROWS:i32 = 25;
 const MAX_COLS:i32 = 80;
 const WHITE_ON_BLACK:u8 = 0x0f;
 
+#[allow(dead_code)]
+#[repr(u8)]
+#[derive(Clone,Copy)]
+pub enum Color {
+    Black = 0,
+    Blue = 1,
+    Green = 2,
+    Cyan = 3,
+    Red = 4,
+    Magenta = 5,
+    Brown = 6,
+    LightGray = 7,
+    DarkGray = 8,
+    LightBlue = 9,
+    LightGreen = 10,
+    LightCyan = 11,
+    LightRed = 12,
+    Pink = 13,
+    Yellow = 14,
+    White = 15,
+}
+
+#[repr(transparent)]
+#[derive(Clone,Copy)]
+pub struct ColorCode(u8);
+
+impl ColorCode {
+    pub fn new(foreground: Color, background: Color) -> ColorCode {
+        ColorCode((background as u8) << 4 | (foreground as u8))
+    }
+}
+
 fn set_cursor(offset: i32) {
     let offset = offset / 2;
     port_byte_out(VGA_CTRL_REGISTER, VGA_OFFSET_HIGH);
@@ -22,10 +54,10 @@ fn set_cursor(offset: i32) {
 }
 
 fn get_cursor() -> i32 {
-    port_byte_out(VGA_CTRL_REGISTER, VGA_OFFSET_HIGH as u8);
+    port_byte_out(VGA_CTRL_REGISTER, VGA_OFFSET_HIGH);
     #[allow(arithmetic_overflow)]
     let mut offset = port_byte_in(VGA_DATA_REGISTER) << 8;
-    port_byte_out(VGA_CTRL_REGISTER, VGA_OFFSET_LOW as u8);
+    port_byte_out(VGA_CTRL_REGISTER, VGA_OFFSET_LOW);
     offset += port_byte_in(VGA_DATA_REGISTER);
     (offset * 2) as i32
 }
@@ -42,69 +74,74 @@ fn move_offset_to_new_line(offset: i32) -> i32 {
     get_offset(0, get_row_from_offset(offset) + 1)
 }
 
-fn set_char_at_video_memory(character: char, offset: &i32) {
+fn set_char_at_video_memory(character: char, offset: &i32,color_code: u8) {
     let vidmem = 0xb8000 as *mut u8;
     unsafe {
         *vidmem.offset(offset.clone() as isize) = character as u8;
-        *vidmem.offset((offset + 1) as isize) = WHITE_ON_BLACK;
+        *vidmem.offset((offset + 1) as isize) = color_code;
     }
 }
 
-pub fn print_str(text: &str) {
+pub fn print_str(text: &str,code: ColorCode) {
     let mut offset = get_cursor();
     let bytes = text.as_bytes();
     for i in bytes {
-        match *i as char {
-            '\n' => {
-                offset = move_offset_to_new_line(offset);
-            }
-            _ => {
-                set_char_at_video_memory(*i as char,&offset);
-                offset += 2;
-            }
+        let character = *i as char;
+        if offset >= MAX_ROWS * MAX_COLS * 2 {
+           //offset = scroll_ln(offset);
+        }
+        if character == '\n' {
+            offset = move_offset_to_new_line(offset);
+        } else {
+            set_char_at_video_memory(*i as char,&offset,code.0);
+            offset += 2;
         }
     }
     set_cursor(offset);
 }
 
+pub fn _print_str(text: char,offset: &mut i32,code: ColorCode) {
+    if *offset >= MAX_ROWS * MAX_COLS * 2 {
+        *offset = scroll_ln(*offset);
+    }
+    if text == '\n' {
+        *offset = move_offset_to_new_line(*offset);
+    } else {
+        set_char_at_video_memory(text,&offset,code.0);
+        *offset += 2;
+    }
+}
+
 pub fn clear_screen() {
     for i in 0..(MAX_COLS*MAX_ROWS) {
-        set_char_at_video_memory(' ', &(i * 2));
+        set_char_at_video_memory(' ', &(i * 2),0x0f);
     }
     set_cursor(get_offset(0,0));
     set_cursor(get_offset(0,0));
 }
 
-fn memory_copy(source: *const i8, dest: *mut i8, nbytes: usize) {
-    let source_slice = unsafe { core::slice::from_raw_parts(source, nbytes) };
-    let dest_slice = unsafe { core::slice::from_raw_parts_mut(dest, nbytes) };
-
-    for i in 0..nbytes {
-        dest_slice[i] = source_slice[i];
+fn memory_copy(source: *const u8, dest: *mut u8, nbytes: usize) {
+    unsafe {
+        for i in 0..nbytes {
+            ptr::write_volatile(dest.offset(i as isize), ptr::read_volatile(source.offset(i as isize)));
+        }
     }
 }
 
-pub fn scroll_ln(offset: i32) -> i32 {
-    memory_copy((get_offset(0,1)+VIDEO_ADDRESS) as *const i8, (get_offset(0,0) + VIDEO_ADDRESS) as *mut i8, (MAX_COLS * (MAX_ROWS - 1) * 2) as usize);
-
-    for i in 0..MAX_COLS {
-        let offset = get_offset(i, MAX_ROWS - 1);
-        set_char_at_video_memory(' ',&offset);
+fn scroll_ln(offset: i32) -> i32 {
+    unsafe {
+        memory_copy(
+            (get_offset(0, 1) + VIDEO_ADDRESS) as *const u8,
+            (get_offset(0, 0) + VIDEO_ADDRESS) as *mut u8,
+            (MAX_COLS * (MAX_ROWS - 1) * 2) as usize
+        );
     }
 
-    offset - 2 * MAX_COLS
-}
+    let color = ColorCode::new(Color::Black,Color::Black);
 
-// int scroll_ln(int offset) {
-// memory_copy(
-// (char *) (get_offset(0, 1) + VIDEO_ADDRESS),
-// (char *) (get_offset(0, 0) + VIDEO_ADDRESS),
-// MAX_COLS * (MAX_ROWS - 1) * 2
-// );
-//
-// for (int col = 0; col < MAX_COLS; col++) {
-// set_char_at_video_memory(' ', get_offset(col, MAX_ROWS - 1));
-// }
-//
-// return offset - 2 * MAX_COLS;
-// }
+    for col in 0..MAX_COLS {
+        set_char_at_video_memory(' ', &get_offset(col, MAX_ROWS - 1),color.0);
+    }
+
+    return offset - 2 * MAX_COLS;
+}
