@@ -8,12 +8,10 @@ use crate::vga::{clear_screen, print_str};
 pub mod vga;
 pub mod port;
 
-static MES: &[u8] = b"FoundOS (version 0.1.0-0.0)";
-
 #[no_mangle]
 pub extern "C" fn main() -> ! {
     clear_screen();
-
+    print_str("FFFF\nFFFF\nFFFF\n");
     loop {
         unsafe {
             asm!("hlt")
