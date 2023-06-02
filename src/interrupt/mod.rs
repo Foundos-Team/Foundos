@@ -1,19 +1,12 @@
+mod isr;
+mod idt;
+
 use lazy_static::lazy_static;
 use spin::Mutex;
-use crate::vga::print_str;
+use crate::vga::{Color, ColorCode, print_str};
 
 lazy_static! {
     pub static ref IDT:Mutex<[IDTGate; 256]> = Mutex::new([IDTGate::null(); 256]);
-}
-
-static EXCEPTION_MESSAGES:[&str; 3] = [
-    "Division by zero",
-    "Debug",
-    "Reserved"
-];
-
-fn isr_handler(r: *const Registers) {
-    print_str(EXCEPTION_MESSAGES[(*r).int_no as usize]);
 }
 
 #[derive(Clone,Copy)]
