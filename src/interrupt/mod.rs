@@ -1,8 +1,40 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
+use crate::vga::print_str;
 
 lazy_static! {
     pub static ref IDT:Mutex<[IDTGate; 256]> = Mutex::new([IDTGate::null(); 256]);
+}
+
+static EXCEPTION_MESSAGES:[&str; 3] = [
+    "Division by zero",
+    "Debug",
+    "Reserved"
+];
+
+fn isr_handler(r: *const Registers) {
+    print_str(EXCEPTION_MESSAGES[(*r).int_no as usize]);
+}
+
+#[derive(Clone,Copy)]
+#[repr(C)]
+pub struct Registers {
+    ds: u32,
+    edi: u32,
+    esi: u32,
+    ebp: u32,
+    esp: u32,
+    ebx: u32,
+    edx: u32,
+    ecx: u32,
+    eax: u32,
+    int_no: u32,
+    err_code: u32,
+    eip: u32,
+    cs: u32,
+    eflags: u32,
+    useresp: u32,
+    ss: u32,
 }
 
 #[repr(C,packed)]
