@@ -3,17 +3,16 @@
 
 use core::panic::PanicInfo;
 use core::arch::asm;
-use crate::vga::{clear_screen, print_str};
+use crate::vga::{clear_screen, Color, ColorCode, print_str};
 
 pub mod vga;
 pub mod port;
 
-static MES: &[u8] = b"FoundOS (version 0.1.0-0.0)";
-
 #[no_mangle]
 pub extern "C" fn main() -> ! {
+    let color = ColorCode::new(Color::White,Color::Black);
     clear_screen();
-
+    print_str("Hello World!\n",color);
     loop {
         unsafe {
             asm!("hlt")
