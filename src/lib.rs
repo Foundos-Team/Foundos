@@ -7,6 +7,7 @@ use crate::vga::{clear_screen, Color, ColorCode, print_str};
 
 pub mod vga;
 pub mod port;
+pub mod interrupt;
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
